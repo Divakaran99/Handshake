@@ -1,0 +1,7 @@
+[project]
+name = "handshake"
+version = "0.0.1"
+description = "An open-source platform for designing, running and analysing human-robot interaction studies, built in Jac."
+
+[build]
+entry = "api/studies.jac"
