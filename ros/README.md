@@ -11,5 +11,9 @@ python3 handshake_node.py --ros-args -p demo:=true   # prove the link first
 python3 handshake_node.py                            # then with your handlers
 ```
 
+On an Ubuntu machine that runs both ROS and Handshake,
+`bash scripts/start_lab.sh --ros --demo` starts rosbridge, this node and the
+web app together (drop `--demo` once your handlers are filled in).
+
 In Handshake, add the robot with the *ROS 2 robot — Handshake contract* preset.
 Full details: [docs/BUILD_GUIDE.md](../docs/BUILD_GUIDE.md#connecting-robots).

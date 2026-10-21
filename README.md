@@ -38,20 +38,24 @@ directly, so the protocol is the data structure and the walker is the runtime.
 
 ## Try it
 
+On Ubuntu 24.04 or 22.04:
+
 ```bash
-pip install jaseci==2.3.28          # jaclang 0.16.7 + jac-client + jac-scale
 git clone https://github.com/Divakaran99/Handshake.git && cd Handshake
-jac install                          # npm packages for the web UI
-jac start main.jac                   # http://localhost:8000
+bash scripts/setup_ubuntu.sh          # add --with-ros to also install ROS 2 + rosbridge
+bash scripts/start_lab.sh --mock      # web app + a stand-in ROS robot; open http://localhost:8000
 ```
 
 Create an account, open **Studies → Add the example study**, and run a session
-on the built-in simulator. To try the ROS path without installing ROS, start the
-mock rosbridge in a second terminal and add a robot from the *ROS 2 robot —
-Handshake contract* preset (it points at `ws://localhost:9090`):
+on the built-in simulator. Then add a robot from the *ROS 2 robot — Handshake
+contract* preset (it points at `ws://localhost:9090`), press *Test connection*,
+and run the same study on it. With ROS installed, `bash scripts/start_lab.sh
+--ros --demo` starts real rosbridge and the robot-side contract node instead.
+
+Elsewhere (Python 3.12+):
 
 ```bash
-jac run tools/mock_rosbridge.jac
+pip install jaseci==2.3.28 && jac install && jac start main.jac
 ```
 
 The original command-line demo still works and needs nothing but jaclang:

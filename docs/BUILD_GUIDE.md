@@ -74,13 +74,54 @@ the walker leaves.
 
 ## 2. Run it locally
 
+### On Ubuntu (24.04 recommended, 22.04 supported)
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/Divakaran99/Handshake.git && cd Handshake
+bash scripts/setup_ubuntu.sh              # Handshake only, ~3 minutes
+bash scripts/setup_ubuntu.sh --with-ros   # also ROS 2 + rosbridge on this machine
+```
+
+The setup script installs `python3-venv`, creates `.venv` with the Jac stack
+(`jaseci==2.3.28`, which needs Python 3.12 or newer), fetches the web UI's
+packages (a project-local `bun` is downloaded automatically, no Node needed) and
+runs the 54-assertion self-test. With `--with-ros` it installs ROS 2 through the
+official `ros2-apt-source` package — **Jazzy on 24.04, Humble on 22.04** — plus
+`rosbridge-suite`. If ROS is already installed it only adds rosbridge.
+
+On 22.04 the system Python is 3.10, so the script adds Python 3.12 from the
+deadsnakes PPA for Handshake only. ROS keeps using the system Python; the two
+never share an interpreter because Handshake talks to ROS over rosbridge.
+
+Then start everything with one command (Ctrl+C stops all of it; logs of the
+background processes go to `.jac/logs/`):
+
+```bash
+bash scripts/start_lab.sh                  # web app + built-in simulator
+bash scripts/start_lab.sh --mock           # + stand-in ROS robot on :9090 (no ROS needed)
+bash scripts/start_lab.sh --ros --demo     # + rosbridge + contract node in log-only mode
+bash scripts/start_lab.sh --ros            # + rosbridge + contract node with your handlers
+bash scripts/start_lab.sh --ros --no-node  # + rosbridge only; the node runs on the robot
+```
+
+Open <http://localhost:8000>. Options: `--port`, `--ros-distro`, `--namespace /robot1`.
+
+Where things run is up to you: the laptop can be the whole lab (simulator in
+Gazebo + rosbridge + Handshake), or Handshake can run on the laptop while
+rosbridge and the contract node run on the robot's computer — then start
+Handshake with `bash scripts/start_lab.sh` and point the robot profile at
+`ws://<robot-ip>:9090`.
+
+### Any other system
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install jaseci==2.3.28            # jaclang 0.16.7, jac-client, jac-scale
-cd Handshake
-jac install                            # npm packages for the web UI
+jac install                            # packages for the web UI
 jac start main.jac                     # API + UI on http://localhost:8000
 ```
+
+### Day-to-day
 
 - `jac start main.jac --dev` hot-reloads `.cl.jac` files. Server modules and
   `glob`s are evaluated once at boot, so restart after editing `api/`,
@@ -201,6 +242,10 @@ panel, which makes it the place to dry-run every branch of a protocol.
    sudo apt install ros-$ROS_DISTRO-rosbridge-suite
    ros2 launch rosbridge_server rosbridge_websocket_launch.xml   # port 9090
    ```
+
+   If ROS runs on the same Ubuntu machine as Handshake,
+   `bash scripts/start_lab.sh --ros --demo` does this step and starts the
+   contract node for you.
 
    Keep `rosapi` enabled (the default launch file starts it); Handshake uses it
    to list topics when you test the connection.
@@ -524,6 +569,29 @@ export HANDSHAKE_ROBOT_HOSTS="10.0.0.12,10.0.0.13"  # robots the server may cont
 jac start main.jac --port 8000
 ```
 
+To keep it running across reboots on Ubuntu, add a systemd unit
+(`/etc/systemd/system/handshake.service`, replace `lab` with your user):
+
+```ini
+[Unit]
+Description=Handshake HRI study server
+After=network-online.target
+
+[Service]
+User=lab
+WorkingDirectory=/home/lab/Handshake
+EnvironmentFile=/home/lab/Handshake/.env
+ExecStart=/home/lab/Handshake/.venv/bin/jac start main.jac --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Put `JWT_SECRET=…`, `HANDSHAKE_ADMIN_PASSWORD=…` and `HANDSHAKE_ROBOT_HOSTS=…`
+in `.env` (one per line), then `sudo systemctl enable --now handshake`. On a
+robot computer you can do the same for rosbridge and `ros/handshake_node.py`.
+
 Back up `.jac/data/` — it is the whole dataset. If you put a reverse proxy in
 front, raise its read timeout above your longest session.
 
@@ -562,6 +630,9 @@ CI (`.github/workflows/ci.yml`) runs all four on every push.
 | A page shows *This page hit an error* | the message and stack are on screen; include them in a bug report. |
 | `Invalid anchor id` after changing node fields | development: stop the server, delete `.jac/data/`. Production: schema aliases (`jac guide jac-sv-persistence`). |
 | Port already in use | an old `jac start` is still running; stop it before restarting. |
+| `start_lab.sh`: *contract node exited* | read `.jac/logs/handshake_node.log`; `No module named rclpy` means ROS is not sourced or the node was started from the venv's Python instead of `/usr/bin/python3`. |
+| `pip install jaseci` fails with *requires Python >=3.12* | Ubuntu 22.04: run `scripts/setup_ubuntu.sh`, which adds Python 3.12 without touching the system Python. |
+| `error: externally-managed-environment` | Ubuntu 24.04 blocks system-wide pip; use the `.venv` the setup script creates. |
 
 ---
 

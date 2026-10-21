@@ -13,6 +13,7 @@ Each run signs up a fresh researcher, so it never touches anyone else's data.
 import json;
 import os;
 import subprocess;
+import sys;
 import time;
 import from urllib.request { Request, urlopen }
 import from urllib.error { HTTPError, URLError }
@@ -62,6 +63,12 @@ def fn(name: str, body: dict[str, object]) -> object {
     return as_dict(r.get("data", None)).get("result", None);
 }
 
+"""The `jac` next to the running interpreter (a venv need not be activated)."""
+def jac_executable -> str {
+    beside = os.path.join(os.path.dirname(sys.executable), "jac");
+    return beside if os.path.exists(beside) else "jac";
+}
+
 def wait_for_server(proc: subprocess.Popen) -> bool {
     deadline = time.monotonic() + 120;
     while time.monotonic() < deadline {
@@ -83,7 +90,7 @@ with entry {
     print(f"starting jac start main.jac on :{PORT} ...");
     # stdin must not be a terminal that closes: `jac start` exits when stdin does.
     proc = subprocess.Popen(
-        ["jac", "start", "main.jac", "--no_client", "--port", str(PORT)],
+        [jac_executable(), "start", "main.jac", "--no_client", "--port", str(PORT)],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
     );
     try {
