@@ -18,7 +18,8 @@ node Step {
         capability: Capability,
         args: dict = {},
         timeout_ms: int = 8000,
-        wizard_gated: bool = False;
+        wizard_gated: bool = False,
+        position: int = 0;   # authoring order in the editor; traversal ignores it
 }
 
 edge HasCondition: StudyProtocol --> Condition {}

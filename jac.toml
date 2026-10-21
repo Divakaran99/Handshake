@@ -1,7 +1,51 @@
 [project]
 name = "handshake"
-version = "0.0.1"
+version = "0.1.0"
 description = "An open-source platform for designing, running and analysing human-robot interaction studies, built in Jac."
+entry-point = "main.jac"
+kind = "fullstack"
 
-[build]
-entry = "api/studies.jac"
+[dependencies.npm]
+react = "^18.2.0"
+react-dom = "^18.2.0"
+react-router-dom = "^6.22.0"
+react-error-boundary = "^5.0.0"
+react-hook-form = "^7.71.0"
+zod = "^4.3.6"
+"@hookform/resolvers" = "^5.2.2"
+
+[dependencies.npm.dev]
+vite = "^6.4.1"
+"@vitejs/plugin-react" = "^4.2.1"
+typescript = "^5.3.3"
+"@types/react" = "^18.2.0"
+"@types/react-dom" = "^18.2.0"
+
+[dev-dependencies]
+watchdog = ">=3.0.0"
+
+[serve]
+base_route_app = "app"
+
+[plugins.client]
+
+[plugins.client.app_meta_data]
+title = "Handshake"
+description = "Design, run and analyse human-robot interaction studies on any robot."
+theme_color = "#1d4ed8"
+
+# Change this in production (JWT_SECRET env var). The fallback is for local use only.
+[plugins.scale.jwt]
+secret = "${JWT_SECRET:-handshake-local-dev-secret-change-me}"
+
+[scripts]
+check = "bash scripts/check.sh"
+verify = "jac run verify/run_all.jac"
+e2e = "jac run verify/api_e2e.jac"
+demo = "jac run examples/proxemics/build_study.jac"
+mock-ros = "jac run tools/mock_rosbridge.jac"
+
+# The admin portal (/admin) account is created on first start and must change
+# its password on first login. Set the initial one through the environment.
+[plugins.scale.admin]
+default_password = "${HANDSHAKE_ADMIN_PASSWORD:-changeme}"
