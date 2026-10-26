@@ -167,15 +167,29 @@ impl StudyPage.remove_branch(i: int, j: int) {
     dirty = True;
 }
 
+"""Move a frozen study to its next version on the server, then reload it unlocked."""
 impl StudyPage.bump_version {
-    parts: list[str] = m_version.split(".");
-    last = parts[len(parts) - 1];
-    if last.isdigit() {
-        head: list[str] = parts[: len(parts) - 1];
-        m_version = join_text(head + [str(int(last) + 1)], ".");
-    } else {
-        m_version = m_version + ".1";
+    study_id = page_id;
+    busy = "version";
+    version_note = "";
+    result: SaveResult | None = None;
+    try {
+        result = await start_new_version(study_id);
+    } except Exception as e {
+        meta_problems = ["Could not start a new version: " + str(e)];
     }
+    busy = "";
+    if result is None {
+        return;
+    }
+    if not result.ok {
+        meta_problems = result.problems;
+        return;
+    }
+    meta_problems = [];
+    meta_note = "";
+    await reload(cond_original);
+    version_note = "Now editing version " + result.version + ". Sessions already run keep the version they ran under.";
 }
 
 impl StudyPage.save_meta {
@@ -191,6 +205,7 @@ impl StudyPage.save_meta {
         return;
     }
     meta_problems = [];
+    version_note = "";
     meta_note = "Saved.";
     await reload(cond_original);
 }

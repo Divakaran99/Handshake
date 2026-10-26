@@ -223,7 +223,7 @@ because this repo also serves as a real-world Jac showcase.
 | Untyped `dict` fields make `.get()` return `any` and trip the strict-any rule | type the field, or narrow with `as_dict` (`adapters/bindings.jac`) |
 | Endpoint effects are classified only for `def:pub`; every `def:priv` call is cached by the client for 60 s | `components/runtime_fixes.cl.jac` turns the read cache off |
 | An `sv import`-ed type is an RPC stub on the client, so `StepSpec(...)` calls the server | `components/wire.cl.jac` builds request objects |
-| `sep.join(items)` on a string fails in client code | `join_text` in `components/ui.cl.jac` |
+| Some Python string methods (`join`, `isdigit`, `isalpha`, `ljust`, …) are missing in the browser runtime; calls pass `jac check`, then fail silently inside click handlers | `join_text` in `components/ui.cl.jac`, logic moved to the server; `scripts/check.sh` flags them |
 | `dict(obj)` in client code compiles to `Object.fromEntries` and throws on objects | dict comprehension copy |
 | Top-level `def`s in a client `.impl.jac` annex are not emitted to the bundle | helpers live in the `.cl.jac` file |
 | A `layout.jac` inside `pages/(auth)/` becomes the root layout for every route | `AppShell` wraps each auth page instead |
@@ -235,7 +235,7 @@ because this repo also serves as a real-world Jac showcase.
 ```bash
 bash scripts/check.sh                 # jac check every module
 jac run verify/run_all.jac            # 54 assertions, includes ROS via the mock
-jac run verify/api_e2e.jac            # 23 end-to-end assertions against `jac start`
+jac run verify/api_e2e.jac            # 28 end-to-end assertions against `jac start`
 jac run examples/proxemics/build_study.jac
 jac start main.jac --dev              # UI hot reload (restart for server changes)
 ```

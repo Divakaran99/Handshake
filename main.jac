@@ -16,7 +16,7 @@ import from api.robots {
     test_robot
 }
 import from api.studies {
-    list_studies, create_study, update_study, delete_study, get_study,
+    list_studies, create_study, update_study, start_new_version, delete_study, get_study,
     save_condition, delete_condition, capability_catalog, create_example_study
 }
 import from api.sessions {

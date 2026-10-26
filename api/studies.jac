@@ -61,6 +61,45 @@ def:priv update_study(study_id: str, draft: StudyDraft) -> SaveResult {
     return SaveResult(ok=True, id=study_id);
 }
 
+"""The version after `current` that no session has used: 0.1.0 -> 0.1.1, v2 -> v3, pilot -> pilot.1."""
+def next_version(current: str, used: list[str]) -> str {
+    candidate = current.strip() or "0.1.0";
+    for _attempt in range(1000) {
+        parts: list[str] = candidate.split(".");
+        last = parts[-1];
+        digits = len(last) - len(last.rstrip("0123456789"));
+        if digits > 0 {
+            bumped = last[: len(last) - digits] + str(int(last[len(last) - digits :]) + 1);
+            candidate = ".".join(parts[:-1] + [bumped]);
+        } else {
+            candidate = candidate + ".1";
+        }
+        if candidate not in used {
+            return candidate;
+        }
+    }
+    raise ValueError(f"no free version after {current}");
+}
+
+"""Unfreeze a study by moving it to the next protocol version, in one step.
+
+Sessions keep the version (and the protocol snapshot) they ran under; the
+steps carry over unchanged and become editable for the new version.
+"""
+def:priv start_new_version(study_id: str) -> SaveResult {
+    s = find_study(study_id);
+    if s is None {
+        return SaveResult(ok=False, problems=["study not found"]);
+    }
+    study: StudyProtocol = s;
+    if not is_frozen(study) {
+        return SaveResult(ok=True, id=study_id, version=study.version);
+    }
+    used = [x.protocol_version for x in study_sessions(study)] + [study.version];
+    study.version = next_version(study.version, used);
+    return SaveResult(ok=True, id=study_id, version=study.version);
+}
+
 """Delete a study and its protocol. Studies with sessions are kept - delete those first."""
 def:priv delete_study(study_id: str) -> SaveResult {
     s = find_study(study_id);

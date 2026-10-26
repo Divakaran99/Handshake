@@ -177,6 +177,24 @@ with entry {
                                                "original_label": "near"}));
         ok("a version with sessions is frozen", not bool(frozen.get("ok", True)));
 
+        bumped = as_dict(fn("start_new_version", {"study_id": study_id}));
+        ok("one click starts the next version", bool(bumped.get("ok", False)) and bumped.get("version", "") == "0.1.1");
+        near = as_dict(conds[0] if isinstance(conds, list) else None);
+        steps = near.get("steps", []);
+        edited_steps = [as_dict(st) for st in (steps if isinstance(steps, list) else [])];
+        edited_steps[-1]["args_json"] = "{\"text\": \"version two\"}";
+        edited = as_dict(fn("save_condition", {"study_id": study_id,
+                                               "spec": {**near, "steps": edited_steps},
+                                               "original_label": "near"}));
+        ok("the new version is editable", bool(edited.get("ok", False)));
+        v2 = as_dict(run(sim_id, "E03", []).get("session", None));
+        ok("new sessions record the new version", v2.get("protocol_version", "") == "0.1.1");
+        old_sess = as_dict(fn("get_session", {"session_id": sim_sess.get("id", "")}));
+        ok("earlier sessions keep their version",
+           as_dict(old_sess.get("summary", None)).get("protocol_version", "") == "0.1.0");
+        again = as_dict(fn("start_new_version", {"study_id": study_id}));
+        ok("versions keep counting up", again.get("version", "") == "0.1.2");
+
         scored = as_dict(fn("record_godspeed", {"session_id": ros_sess.get("id", ""),
                                                 "responses": {"fake_natural": 4, "machine_human": 2}}));
         ok("Godspeed response is scored", scored.get("godspeed", -1) == 3.0);
@@ -200,7 +218,7 @@ with entry {
         removed = fn("withdraw_participant", {"code": "E02"});
         ok("withdrawal deletes the participant's sessions", removed == 1);
         left = fn("list_sessions", {"study_id": study_id});
-        ok("withdrawn data is gone", isinstance(left, list) and len(left) == 1);
+        ok("withdrawn data is gone", isinstance(left, list) and len(left) == 2);
     } finally {
         proc.terminate();
         try {

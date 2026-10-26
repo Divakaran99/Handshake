@@ -5,7 +5,7 @@ are stateless and report edits upward. Handler bodies: StudyPage.impl.jac.
 """
 
 import from "@jac/runtime" { Link, useParams, useNavigate }
-import from .ui { Badge, Problems, Empty, confirm_action, join_text }
+import from .ui { Badge, Problems, Empty, confirm_action }
 import from .StepRail { StepRail }
 import from .RunPanel { RunPanel }
 import from .SessionTable { SessionTable }
@@ -16,8 +16,8 @@ sv import from ..api.views {
     CapabilityInfo, RobotView, RunRequest, RunResult, PerceptChoice, SessionSummary
 }
 sv import from ..api.studies {
-    get_study, update_study, delete_study, save_condition, delete_condition,
-    capability_catalog
+    get_study, update_study, start_new_version, delete_study, save_condition,
+    delete_condition, capability_catalog
 }
 sv import from ..api.robots { list_robots }
 sv import from ..api.sessions { run_session, list_sessions }
@@ -44,6 +44,7 @@ def:pub StudyPage -> JsxElement {
         m_prereg: str = "",
         meta_problems: list[str] = [],
         meta_note: str = "",
+        version_note: str = "",
         cond_original: str = "",
         cond_label: str = "",
         cond_factors: str = "{}",
@@ -81,7 +82,7 @@ def:pub StudyPage -> JsxElement {
     async def remove_cond;
     async def remove_study;
     async def run;
-    def bump_version;
+    async def bump_version;
 
     def set_choice(step_label: str, percept: str) {
         merged: dict[str, str] = {k: v for (k, v) in run_choices.items()};
@@ -129,7 +130,7 @@ def:pub StudyPage -> JsxElement {
                             <div className="row">
                                 <input className="input mono" style={{"flex": "1", "width": "auto"}} value={m_version}
                                     onChange={lambda e: ChangeEvent { m_version = e.target.value; }}/>
-                                {frozen and <button className="btn small" type="button" onClick={lambda e: MouseEvent { bump_version(); }}>Start a new version</button>}
+                                {frozen and <button className="btn small" type="button" disabled={busy != ""} onClick={lambda e: MouseEvent { bump_version(); }}>Start a new version</button>}
                             </div>
                         </label>
                     </div>
@@ -145,11 +146,18 @@ def:pub StudyPage -> JsxElement {
             </details>
 
             {frozen and
-                <div className="notice warn" style={{"marginTop": "16px"}} role="status">
-                    Version {d.study.version} has produced sessions, so its protocol is frozen and every session stays traceable to it.
-                    To change steps or the pre-registration, start a new version in the details above.
+                <div className="notice warn row" style={{"marginTop": "16px", "flexWrap": "nowrap"}} role="status">
+                    <span className="spacer">
+                        Version {d.study.version} has produced sessions, so its protocol is frozen and every
+                        session stays traceable to it. Start a new version to change steps or the pre-registration;
+                        the steps carry over and existing sessions keep version {d.study.version}.
+                    </span>
+                    <button className="btn primary" disabled={busy != ""} onClick={lambda e: MouseEvent { bump_version(); }}>
+                        {"Starting…" if busy == "version" else "Start a new version"}
+                    </button>
                 </div>
             }
+            {version_note and <div className="notice good" style={{"marginTop": "16px"}} role="status">{version_note}</div>}
 
             <section style={{"marginTop": "24px"}}>
                 <div className="panel-head">

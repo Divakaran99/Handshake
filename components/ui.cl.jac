@@ -63,8 +63,8 @@ def:pub confirm_action(message: str) -> bool {
 
 """Join strings with a separator.
 
-The client runtime in jaclang 0.16.7 does not support `sep.join(items)` on
-strings, so client code uses this helper instead.
+The browser runtime in jaclang 0.16.7 has no string join method, so client
+code uses this helper instead (scripts/check.sh flags the method in client files).
 """
 def:pub join_text(items: list[str], sep: str) -> str {
     out = "";

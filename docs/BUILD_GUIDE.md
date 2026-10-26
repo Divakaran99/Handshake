@@ -480,9 +480,11 @@ label out of the message. `field` paths are dotted (`pose.position.x`).
   perceived*.
 - **Duplicate** a condition to create the other arm and change only the factor
   you manipulate.
-- A version that has produced sessions is **frozen**. Use *Start a new version*
-  to edit; old sessions keep their version and a snapshot of the exact
-  condition they ran.
+- A version that has produced sessions is **frozen**. Click *Start a new version*
+  in the yellow notice: the study moves to the next number (0.1.0 → 0.1.1) and
+  the editor unlocks with the same steps. Old sessions keep their version and a
+  snapshot of the exact condition they ran. To choose a different number, type
+  it in *Protocol details* and click *Save details*.
 
 ---
 
@@ -607,9 +609,9 @@ pods must still reach your robots.
 
 | Command | What it proves |
 |---|---|
-| `bash scripts/check.sh` | every module type-checks |
+| `bash scripts/check.sh` | every module type-checks, and client code avoids string methods the browser runtime lacks |
 | `jac run verify/run_all.jac` | 54 assertions: simulator, bindings and templates, every preset, the protocol editor round trip, branching, and the full rosbridge path (contract, direct topics, Nav2 actions, percepts, offline robots) against the mock |
-| `jac run verify/api_e2e.jac` | 23 assertions against a real `jac start`: sign-up, auth, robots, runs on sim and ROS, freezing, Godspeed, export, cross-user isolation, withdrawal |
+| `jac run verify/api_e2e.jac` | 28 assertions against a real `jac start`: sign-up, auth, robots, runs on sim and ROS, freezing and new versions, Godspeed, export, cross-user isolation, withdrawal |
 | `jac run examples/proxemics/build_study.jac` | the original command-line study |
 
 CI (`.github/workflows/ci.yml`) runs all four on every push.

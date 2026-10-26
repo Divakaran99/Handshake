@@ -45,7 +45,8 @@ obj RobotDraft {
 obj SaveResult {
     has ok: bool,
         id: str = "",
-        problems: list[str] = [];
+        problems: list[str] = [],
+        version: str = "";    # set by start_new_version: the version now being edited
 }
 
 # ------------------------------------------------------------ studies ----
