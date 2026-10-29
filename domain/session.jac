@@ -1,6 +1,7 @@
 """Run-time graph: one subgraph per session. This is the dataset."""
 
 import from domain.participant { Participant }
+import from domain.protocol { StudyProtocol }
 
 enum EventKind {
     SESSION_START,
@@ -21,7 +22,9 @@ node Session {
         robot_profile: str,
         seed: int = 0,
         t0_wall_iso: str = "",
-        status: str = "created";
+        status: str = "created",
+        participant_code: str = "",
+        protocol_snapshot: str = "";   # the condition's steps as JSON, frozen at run time
 }
 
 node Event {
@@ -35,3 +38,5 @@ node Event {
 edge Logged: Session --> Event {}
 
 edge Ran: Participant --> Session {}
+
+edge Produced: StudyProtocol --> Session {}

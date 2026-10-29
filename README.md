@@ -3,8 +3,11 @@
 **An open-source platform for designing, running and analysing human-robot
 interaction studies — built entirely in [Jac](https://www.jac-lang.org).**
 
-> Status: **v0 walking skeleton.** Every layer exists end to end and runs with
-> no hardware. Depth comes next. See [Roadmap](#roadmap).
+> Status: **v1 application.** A full-stack Jac app (API + web UI) that connects
+> to the built-in simulator, any ROS 1 or ROS 2 system through rosbridge
+> (including Gazebo, Webots, Isaac Sim and other ROS-connected simulators),
+> robots with an HTTP API, and custom Python/Jac adapters. Everything runs and
+> is tested with no hardware. See [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md).
 
 HRI research has a tooling gap. ROS is excellent at control and has no concept
 of an experiment. PsychoPy and jsPsych are excellent at experiments and have no
@@ -33,26 +36,54 @@ directly, so the protocol is the data structure and the walker is the runtime.
 
 ---
 
-## Try it in 60 seconds
+## Try it
+
+On Ubuntu 24.04 or 22.04:
 
 ```bash
-pip install jaclang==0.16.7
 git clone https://github.com/Divakaran99/Handshake.git && cd Handshake
+bash scripts/setup_ubuntu.sh          # add --with-ros to also install ROS 2 + rosbridge
+bash scripts/start_lab.sh --mock      # web app + a stand-in ROS robot; open http://localhost:8000
+```
+
+Create an account, open **Studies → Add the example study**, and run a session
+on the built-in simulator. Then add a robot from the *ROS 2 robot — Handshake
+contract* preset (it points at `ws://localhost:9090`), press *Test connection*,
+and run the same study on it. With ROS installed, `bash scripts/start_lab.sh
+--ros --demo` starts real rosbridge and the robot-side contract node instead.
+
+Elsewhere (Python 3.12+):
+
+```bash
+pip install jaseci==2.3.28 && jac install && jac start main.jac
+```
+
+The original command-line demo still works and needs nothing but jaclang:
+
+```bash
 jac run examples/proxemics/build_study.jac
 ```
 
-That builds a two-condition greeting study, runs two participants through it on
-a simulated robot, branches on a gaze percept in one condition and on a timeout
-in the other, and prints per-condition descriptives:
+---
 
-```
-================ DESCRIPTIVES ================
-session           cond     steps  events  percepts  fails     ms
-S-P01-near        near         5      17         1      1      9
-S-P02-far         far          5      16         0      1      4
-```
+## Connect your robot
 
-No hardware. No database. No configuration.
+| Your robot | Connector | What you run on the robot side |
+|---|---|---|
+| Nothing yet | Built-in simulator | nothing |
+| ROS 2 robot (Humble, Jazzy, …) | rosbridge | `ros2 launch rosbridge_server rosbridge_websocket_launch.xml` |
+| ROS 1 robot (Noetic) | rosbridge | `roslaunch rosbridge_server rosbridge_websocket.launch` |
+| Gazebo, Webots, Isaac Sim, CoppeliaSim | rosbridge | the simulator's ROS 2 bridge + rosbridge |
+| Robot with a REST API | HTTP | nothing (Handshake calls its API) |
+| Vendor SDK (NAOqi, proprietary) | Custom adapter | a `RobotAdapter` subclass in `adapters/` |
+
+Each robot profile maps the eight behavioural capabilities onto what the robot
+already understands — a ROS topic, service or action, an HTTP endpoint, or a
+**Handshake intent** handled by the small reference node in
+[`ros/handshake_node.py`](ros/handshake_node.py). Percept rules turn ROS
+messages into labels a protocol can branch on. The **Test connection** button
+lists the topics actually on the ROS graph and warns when nothing is listening.
+Full walkthrough: [docs/BUILD_GUIDE.md](docs/BUILD_GUIDE.md#connecting-robots).
 
 ---
 
@@ -71,9 +102,9 @@ These are load-bearing. Changing them changes the project.
 Protocols express intent — `approach(stop_distance=1.2, speed=0.4)`,
 `gaze(target=face, hold_ms=1800)` — which is exactly what HRI researchers
 manipulate as independent variables. The robot's own certified stack executes
-it. Handshake records **commanded vs. achieved**, so "we set approach speed to
-0.4 m/s" becomes "commanded 0.4; achieved median 0.31" — a methods contribution
-most HRI papers cannot currently make.
+it. Handshake records **commanded vs. achieved** and the exact payload sent, so
+"we set approach speed to 0.4 m/s" becomes "commanded 0.4; achieved median
+0.31" — a methods contribution most HRI papers cannot currently make.
 
 ### 2. Protocols are authored against capabilities, never robots
 
@@ -84,49 +115,62 @@ path is exercised on every CI run rather than only on exotic hardware.
 
 ### 3. Everything runs with no robot
 
-`SimAdapter` is the reference implementation, the CI target, and the
-contributor on-ramp. Real hardware is the special case.
+`SimAdapter` is the reference implementation and `tools/mock_rosbridge.jac`
+stands in for a ROS system, so the whole ROS path is CI-tested without ROS.
 
 ### 4. Analysis plans are versioned with the protocol
 
-A tool that makes it trivial to run 40 comparisons and surface the significant
-ones is a p-hacking machine. `StudyProtocol.prereg` is part of the versioned
-protocol; anything computed afterwards is marked exploratory.
+`StudyProtocol.prereg` is part of the versioned protocol. A version that has
+produced sessions is **frozen**: changing its steps or pre-registration
+requires a new version number, and every session stores a snapshot of the exact
+condition it ran.
 
 ---
 
 ## Architecture
 
-![System architecture](docs/diagrams/01_system_architecture.png)
-
-![Domain model](docs/diagrams/02_domain_model.png)
-
 ```
 Handshake/
+├── main.jac        entry: imports every endpoint, mounts the web app
 ├── domain/         nodes, edges, enums — knows nothing about HTTP or robots
 │   ├── capability.jac      the capability taxonomy (start here)
 │   ├── protocol.jac        StudyProtocol, Condition, Step, Next
 │   ├── participant.jac     Participant, ConsentRecord
-│   └── session.jac         Session, Event, EventKind
+│   ├── session.jac         Session, Event, EventKind
+│   └── robot.jac           RobotProfile (connection + bindings)
 ├── adapters/       the robot seam
 │   ├── adapter.jac         abstract RobotAdapter interface
-│   └── sim.jac             reference simulated robot
+│   ├── sim.jac             reference simulated robot
+│   ├── bindings.jac        capability bindings + percept rules (parse, validate, render)
+│   ├── bound.jac           shared machinery for binding-driven adapters
+│   ├── rosbridge.jac       ROS 1 / ROS 2 over rosbridge WebSocket
+│   ├── http.jac            robots with a REST API
+│   ├── registry.jac        profile -> adapter (the only place that knows every kind)
+│   └── presets.jac         starting profiles (sim, ROS 2, Nav2, ROS 1, HTTP, plugin)
 ├── runtime/
 │   ├── clock.jac           single monotonic reference + per-source offsets
-│   └── session_runtime.jac the session walker
+│   └── session_runtime.jac the session walker + run_condition
 ├── instruments/    typed scales (Godspeed included)
 ├── insights/       descriptive metrics off the session subgraph
-├── api/            the ONLY module with access modifiers
+├── api/            the ONLY server modules with access modifiers (all def:priv)
+├── components/     the web UI (.cl.jac), one stateful shell per page
+├── pages/          file-based routes; (auth)/ pages require sign-in
+├── assets/         global CSS (design tokens)
+├── ros/            robot-side reference node for the Handshake ROS contract
+├── tools/          mock rosbridge server
 ├── examples/       runnable reference study
-└── verify/         assertion suite
+└── verify/         assertion suite + end-to-end API check
 ```
 
-Two conventions worth keeping:
+Conventions worth keeping:
 
-- **`api/` is the only place `walker:priv` / `def:pub` appears.** Auditing the
-  network surface means reading one file.
+- **`api/` is the only place server endpoints are declared.** Auditing the
+  network surface means reading four files. Every endpoint is `def:priv`, so it
+  runs on the authenticated researcher's own root.
 - **`domain/` never imports from `api/` or `adapters/`.** The domain does not
   know a server or a robot exists.
+- **`adapters/registry.jac` is the only module that knows every connector.**
+  Adding a robot kind never touches a protocol, the runtime or the UI.
 
 ---
 
@@ -135,50 +179,65 @@ Two conventions worth keeping:
 | Capability | Mechanism |
 |---|---|
 | Persistence, no ORM or migrations | reachability from `root` |
-| Per-researcher isolation | `walker:priv` runs on the caller's own root |
-| Participant withdrawal (IRB / GDPR) | `del participant` cascades the subtree |
-| Typed REST + client stubs | generated from `walker:priv` signatures |
-| Protocol sharing between labs | `grant` / `revoke` on a node |
+| Per-researcher isolation | `def:priv` runs on the caller's own root |
+| Typed API + generated client stubs | `sv import` from `.cl.jac` components |
+| React UI written in Jac | `.cl.jac` components compiled by jac-client |
+| Participant withdrawal (IRB / GDPR) | `withdraw_participant` deletes events, sessions, consent |
+| Production deploy | `jac start --scale` (jac-scale: MongoDB, Redis, Kubernetes) |
 
 ---
 
 ## Roadmap
 
-**v0 — walking skeleton (current).** Capability taxonomy, protocol graph,
-session walker with percept and timeout branching, sim adapter with degradation
-and commanded-vs-achieved telemetry, typed instruments, descriptive metrics,
-private API surface, runnable reference study.
+**v0 — walking skeleton.** Capability taxonomy, protocol graph, session walker,
+sim adapter with degradation and telemetry, instruments, metrics. *Done.*
 
-**v1 — autonomy and perception.** Real voice pipeline (VAD → ASR → TTS), three
-vision percepts (face presence, gaze-on-robot, distance), Wizard-of-Oz console,
-session replay, the second robot adapter — the real test of the abstraction.
+**v1 — the application (current).** Web UI, per-researcher accounts, robot
+registry, rosbridge adapter for ROS 1/2 and ROS-connected simulators, HTTP and
+plugin adapters, robot-side contract node, protocol editor with percept
+branches, run console, session trail, Godspeed entry, CSV export, version
+freezing with protocol snapshots, mock rosbridge, end-to-end tests.
+
+**v1.x — live operation.** Streamed session progress, Wizard-of-Oz console
+(`wizard_gated` steps), voice pipeline (VAD → ASR → TTS), vision percepts
+(face presence, gaze-on-robot, distance), session replay against recordings.
 
 **v2 — the platform claim.** Annotation studio with inter-rater reliability,
 AI-assisted pre-annotation via `by llm()`, condition contrasts with effect
-sizes, protocol sharing, adapter plugin ecosystem.
+sizes, protocol sharing between labs, adapter plugin ecosystem.
 
 ---
 
 ## Known issues in the toolchain
 
-Found while building this, on jaclang 0.16.7. Documented because this repo also
-serves as a real-world Jac showcase.
+Found while building this, on jaclang 0.16.7 / jac-client 0.3.25. Documented
+because this repo also serves as a real-world Jac showcase.
 
 | Issue | Workaround |
 |---|---|
 | `round(x, n)` runs fine but fails `jac check` (stub gap) | fixed-point arithmetic; see `adapters/sim.jac` |
 | A node named `Protocol` collides with ambient `typing.Protocol` | named `StudyProtocol` |
-| `jac test` fails with a bytecode-cache error in some environments | assertion suite in `verify/run_all.jac` |
+| `jac test` fails with a bytecode-cache error in some environments | assertion suites in `verify/` |
 | Edge entry/exit abilities compile but never fire (documented Jac limitation) | edge logic lives in walker node abilities |
 | `report` also prints to stdout | expected; read `result.reports` |
-| Untyped `dict` fields make `.get()` return `any` and trip the strict-any rule | type the field: `dict[str, str]` |
+| Untyped `dict` fields make `.get()` return `any` and trip the strict-any rule | type the field, or narrow with `as_dict` (`adapters/bindings.jac`) |
+| Endpoint effects are classified only for `def:pub`; every `def:priv` call is cached by the client for 60 s | `components/runtime_fixes.cl.jac` turns the read cache off |
+| An `sv import`-ed type is an RPC stub on the client, so `StepSpec(...)` calls the server | `components/wire.cl.jac` builds request objects |
+| Some Python string methods (`join`, `isdigit`, `isalpha`, `ljust`, …) are missing in the browser runtime; calls pass `jac check`, then fail silently inside click handlers | `join_text` in `components/ui.cl.jac`, logic moved to the server; `scripts/check.sh` flags them |
+| `dict(obj)` in client code compiles to `Object.fromEntries` and throws on objects | dict comprehension copy |
+| Top-level `def`s in a client `.impl.jac` annex are not emitted to the bundle | helpers live in the `.cl.jac` file |
+| A `layout.jac` inside `pages/(auth)/` becomes the root layout for every route | `AppShell` wraps each auth page instead |
+| The runtime's error fallback dereferences the error wrongly and hides the message | `PageError` boundary in `components/AppShell.cl.jac` |
+| `jac start --faux` prints the API, then exits with `server_close` AttributeError | harmless |
 
 ## Development
 
 ```bash
-for f in $(find domain adapters runtime instruments insights api examples verify -type f -name '*.jac'); do jac check "$f"; done
-jac run verify/run_all.jac
+bash scripts/check.sh                 # jac check every module
+jac run verify/run_all.jac            # 54 assertions, includes ROS via the mock
+jac run verify/api_e2e.jac            # 28 end-to-end assertions against `jac start`
 jac run examples/proxemics/build_study.jac
+jac start main.jac --dev              # UI hot reload (restart for server changes)
 ```
 
 ## License

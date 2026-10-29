@@ -44,6 +44,7 @@ obj CapabilityResult {
         ended_ms: int = 0,
         commanded: dict = {},
         achieved: dict = {},
+        wire: dict[str, object] = {},    # exactly what went to the robot (topic/service/action/http + payload)
         detail: str = "";
 
     def duration_ms -> int {
